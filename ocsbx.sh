@@ -8,7 +8,16 @@ IMAGE="opencode-sandbox"
 toplevel=$(git rev-parse --show-toplevel); toplevel=$(cd "$toplevel" && pwd -P)
 common=$(git rev-parse --path-format=absolute --git-common-dir); common=$(cd "$common" && pwd -P)
 
-name="oc-$(basename "$toplevel")"
+hash=$(openssl rand -hex 4)
+
+case "$common/" in
+  "$toplevel"/*)
+    name="oc-$(basename "$toplevel")-$hash"
+    ;;
+  *)
+    name="oc-$(basename "$(dirname "$common")")-$(basename "$toplevel")-$hash"
+    ;;
+esac
 
 # always mount the working tree at its own absolute path
 mounts=(-v "$toplevel:$toplevel")
@@ -23,5 +32,6 @@ exec container run --rm -it --name "$name" \
   "${mounts[@]}" -w "$toplevel" \
   -v ~/.config/opencode:/tmp/opencode-config:ro \
   -v ~/.local/share/opencode:/tmp/opencode-data:ro \
-  -v opencode-cache:/root/.cache/opencode \
+  -v ~/.local/state/opencode:/tmp/opencode-state:ro \
+  -v ~/.cache/opencode:/root/.cache/opencode \
   "$IMAGE" opencode

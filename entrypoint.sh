@@ -4,9 +4,13 @@
 mkdir /root/.config
 cp -r /tmp/opencode-config /root/.config/opencode
 
-# Copy other OpenCode things
-mkdir -p /root/.local/share/opencode
-[[ -f /tmp/opencode-data/mcp-auth.json ]] && cp /tmp/opencode-data/mcp-auth.json /root/.local/share/opencode/
+# Copy OpenCode data
+mkdir -p /root/.local/share
+cp -r /tmp/opencode-data /root/.local/share/opencode
+
+# Copy OpenCode state
+mkdir -p /root/.local/state
+cp -r /tmp/opencode-state /root/.local/state/opencode
 
 # Replace LLM endpoints to host.container.internal
 sed -i 's/localhost/host.container.internal/g' /root/.config/opencode/opencode.json
