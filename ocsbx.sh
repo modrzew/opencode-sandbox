@@ -3,7 +3,6 @@
 set -euo pipefail
 
 IMAGE="opencode-sandbox"
-MLX_URL="http://HOST_GATEWAY:8080"   # your oMLX address as seen from the container — see note
 
 # absolute, symlink-resolved paths
 toplevel=$(git rev-parse --show-toplevel); toplevel=$(cd "$toplevel" && pwd -P)
@@ -22,5 +21,5 @@ esac
 
 exec container run --rm -it --name "$name" \
   "${mounts[@]}" -w "$toplevel" \
-  -v ~/.config/opencode:/root/.config/opencode
+  -v ~/.config/opencode:/tmp/opencode-config:ro \
   "$IMAGE" opencode
