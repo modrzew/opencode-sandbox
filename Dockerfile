@@ -19,6 +19,7 @@ ENV PATH="/root/.bun/bin:${PATH}"
 # OpenCode (confirm against their current install docs)
 RUN curl -fsSL https://opencode.ai/install | bash
 ENV PATH="/root/.opencode/bin:${PATH}"
+ENV OPENCODE_ENABLE_EXA=1
 
 COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
