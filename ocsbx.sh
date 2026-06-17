@@ -22,4 +22,5 @@ esac
 exec container run --rm -it --name "$name" \
   "${mounts[@]}" -w "$toplevel" \
   -v ~/.config/opencode:/tmp/opencode-config:ro \
+  -v ~/.local/share/opencode:/tmp/opencode-data:ro \
   "$IMAGE" opencode
