@@ -5,25 +5,19 @@ mkdir /root/.config
 cp -r /tmp/opencode-config /root/.config/opencode
 
 # Copy other OpenCode things
-mkdir -p /root/.local/share
+mkdir -p /root/.local/share/opencode
 [[ -f /tmp/opencode-data/mcp-auth.json ]] && cp /tmp/opencode-data/mcp-auth.json /root/.local/share/opencode/
 
 # Replace LLM endpoints to host.container.internal
-sed -i 's/localhost/host.container.internal/g' /root/.config/opencode/opencode.jsonc
+sed -i 's/localhost/host.container.internal/g' /root/.config/opencode/opencode.json
 # Replace permissions object with {} (ie. yolo mode)
 python3 -c "
 import re, json
-with open('/root/.config/opencode/opencode.jsonc') as f:
-    raw = f.read()
-# Strip comments to get valid JSON
-cleaned = re.sub(r'//[^\\n]*', '', raw)
-cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL)
-cfg = json.loads(cleaned)
+path='/root/.config/opencode/opencode.json'
+raw = open(path).read()
+cfg = json.loads(re.sub(r',\s*([}\]])', r'\1', raw))
 cfg['permission'] = {}
-# Preserve original formatting: just swap the permission block
-json_str = json.dumps(cfg, indent=2)
-with open('/root/.config/opencode/opencode.jsonc', 'w') as f:
-    f.write(json_str + '\\n')
+open(path, 'w').write(json.dumps(cfg, indent=2) + '\n')
 "
 
 exec "$@"
