@@ -29,6 +29,7 @@ case "$common/" in
 esac
 
 exec container run --rm -it --name "$name" \
+  --cpus 8 --memory 32g \
   "${mounts[@]}" -w "$toplevel" \
   -v ~/.config/opencode:/tmp/opencode-config:ro \
   -v ~/.local/share/opencode:/tmp/opencode-data:ro \
