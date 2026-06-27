@@ -50,6 +50,20 @@ else
       *) mounts+=(-v "$common:$common") ;;  # linked worktree — add the shared .git
     esac
 
+    # Resolve the real path of this script (follows symlinks) to find sandbox.env
+    SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd -P)"
+    CONFIG_FILE="$SCRIPT_DIR/sandbox.env"
+    source "$CONFIG_FILE"
+
+    # Mount SSH key if configured
+    [ -n "$SSH_KEY_PATH" ] && [ -f "$SSH_KEY_PATH" ] && mounts+=(-v "$SSH_KEY_PATH:/tmp/opencode-ssh-key:ro")
+
+    # Mount sandbox config for entrypoint to source
+    mounts+=(-v "$CONFIG_FILE:/tmp/sandbox.env:ro")
+
+    # Capture gh token live from host
+    GH_TOKEN=$(gh auth token 2>/dev/null || true)
+
     container start -ai "$name" 2>/dev/null || \
     container run -it --name "$name" \
       --cpus 4 --memory 8g \
@@ -58,6 +72,7 @@ else
       -v ~/.local/share/opencode:/tmp/opencode-data:ro \
       -v ~/.cache/opencode:/root/.cache/opencode \
       -v ~/.local/state/opencode:/tmp/opencode-state:ro \
+      -e GH_TOKEN="$GH_TOKEN" \
       "$IMAGE" opencode
 fi
 
