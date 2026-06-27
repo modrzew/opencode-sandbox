@@ -1,4 +1,4 @@
-Run Opencode in a sandbox powered by [Apple containers](https://github.com/apple/container).
+Run Opencode in a sandbox powered by [Apple containers](https://github.com/apple/container) with access to `git` and `gh`.
 
 Usage: `ocsbx.sh` to start, `ocsbx.sh <hash>` to resume an existing container.
 
