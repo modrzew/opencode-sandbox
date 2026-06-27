@@ -1,7 +1,7 @@
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl git unzip \
+      ca-certificates curl git unzip openssh-client \
       build-essential python3 python3-venv python3-pip \
       wget apt-transport-https \
     && rm -rf /var/lib/apt/lists/*
