@@ -36,11 +36,8 @@ if [ -f /tmp/opencode-ssh-key ]; then
 fi
 
 # Set git identity
-if [ -f /tmp/sandbox.env ]; then
-  source /tmp/sandbox.env
-  [ -n "$GIT_NAME" ] && git config --global user.name "$GIT_NAME"
-  [ -n "$GIT_EMAIL" ] && git config --global user.email "$GIT_EMAIL"
-fi
+[ -n "${GIT_NAME:-}" ] && git config --global user.name "$GIT_NAME"
+[ -n "${GIT_EMAIL:-}" ] && git config --global user.email "$GIT_EMAIL"
 
 # gh will use GH_TOKEN env var automatically for authentication
 

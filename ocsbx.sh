@@ -55,16 +55,19 @@ else
     CONFIG_FILE="$SCRIPT_DIR/sandbox.env"
     source "$CONFIG_FILE"
 
-    # Mount SSH key if configured
-    [ -n "$SSH_KEY_PATH" ] && [ -f "$SSH_KEY_PATH" ] && mounts+=(-v "$SSH_KEY_PATH:/tmp/opencode-ssh-key:ro")
-
-    # Mount sandbox config for entrypoint to source
-    mounts+=(-v "$CONFIG_FILE:/tmp/sandbox.env:ro")
+    # Mount SSH key if configured (only if outside the mounted directory)
+    if [ -n "$SSH_KEY_PATH" ] && [ -f "$SSH_KEY_PATH" ]; then
+        resolved_key=$(cd "$(dirname "$SSH_KEY_PATH")" && pwd -P)/$(basename "$SSH_KEY_PATH")
+        case "$resolved_key/" in
+          "$toplevel"/*) ;;
+          *) mounts+=(-v "$SSH_KEY_PATH:/tmp/opencode-ssh-key:ro") ;;
+        esac
+    fi
 
     # Capture gh token live from host
     GH_TOKEN=$(gh auth token 2>/dev/null || true)
 
-    container start -ai "$name" 2>/dev/null || \
+    # container start -ai "$name" 2>/dev/null || \
     container run -it --name "$name" \
       --cpus 4 --memory 8g \
       "${mounts[@]}" -w "$toplevel" \
@@ -73,6 +76,8 @@ else
       -v ~/.cache/opencode:/root/.cache/opencode \
       -v ~/.local/state/opencode:/tmp/opencode-state:ro \
       -e GH_TOKEN="$GH_TOKEN" \
+      -e GIT_NAME="$GIT_NAME" \
+      -e GIT_EMAIL="$GIT_EMAIL" \
       "$IMAGE" opencode
 fi
 
