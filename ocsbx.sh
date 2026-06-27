@@ -10,29 +10,57 @@ common=$(git rev-parse --path-format=absolute --git-common-dir); common=$(cd "$c
 
 hash=$(openssl rand -hex 4)
 
-case "$common/" in
-  "$toplevel"/*)
-    name="oc-$(basename "$toplevel")-$hash"
-    ;;
-  *)
-    name="oc-$(basename "$(dirname "$common")")-$(basename "$toplevel")-$hash"
-    ;;
-esac
+# compute container name from hash
+compute_name() {
+    local h="$1"
+    case "$common/" in
+      "$toplevel"/*)
+        echo "oc-$(basename "$toplevel")-$h"
+        ;;
+      *)
+        echo "oc-$(basename "$(dirname "$common")")-$(basename "$toplevel")-$h"
+        ;;
+    esac
+}
 
-# always mount the working tree at its own absolute path
-mounts=(-v "$toplevel:$toplevel")
+# --- resume mode: ./ocsbx.sh <hash> ---
+if [ $# -ge 1 ]; then
+    hash="$1"
+    name=$(compute_name "$hash")
+    if ! container start "$name" >/dev/null 2>&1; then
+        echo "Error: container $name not found"
+        exit 1
+    fi
+    sleep 1
+    set +e
+    container exec -it "$name" opencode -c
+    rc=$?
+    container stop "$name" >/dev/null 2>&1
+    set -e
+else
+    # --- fresh mode: ./ocsbx.sh ---
+    name=$(compute_name "$hash")
 
-# the worktree check: if the shared .git lives OUTSIDE the tree, mount it too
-case "$common/" in
-  "$toplevel"/*) ;;                     # main repo — .git already inside the mount
-  *) mounts+=(-v "$common:$common") ;;  # linked worktree — add the shared .git
-esac
+    # always mount the working tree at its own absolute path
+    mounts=(-v "$toplevel:$toplevel")
 
-exec container run --rm -it --name "$name" \
-  --cpus 4 --memory 8g \
-  "${mounts[@]}" -w "$toplevel" \
-  -v ~/.config/opencode:/tmp/opencode-config:ro \
-  -v ~/.local/share/opencode:/tmp/opencode-data:ro \
-  -v ~/.local/state/opencode:/tmp/opencode-state:ro \
-  -v ~/.cache/opencode:/root/.cache/opencode \
-  "$IMAGE" opencode
+    # the worktree check: if the shared .git lives OUTSIDE the tree, mount it too
+    case "$common/" in
+      "$toplevel"/*) ;;                     # main repo — .git already inside the mount
+      *) mounts+=(-v "$common:$common") ;;  # linked worktree — add the shared .git
+    esac
+
+    container start -ai "$name" 2>/dev/null || \
+    container run -it --name "$name" \
+      --cpus 4 --memory 8g \
+      "${mounts[@]}" -w "$toplevel" \
+      -v ~/.config/opencode:/tmp/opencode-config:ro \
+      -v ~/.local/share/opencode:/tmp/opencode-data:ro \
+      -v ~/.cache/opencode:/root/.cache/opencode \
+      -v ~/.local/state/opencode:/tmp/opencode-state:ro \
+      "$IMAGE" opencode
+fi
+
+echo ""
+echo "Resume: ./ocsbx.sh $hash"
+echo "Or: container exec -it $name opencode -c"
