@@ -69,7 +69,7 @@ else
 
     # container start -ai "$name" 2>/dev/null || \
     container run -it --name "$name" \
-      --cpus 4 --memory 8g \
+      --cpus 4 --memory 6g \
       "${mounts[@]}" -w "$toplevel" \
       -v ~/.config/opencode:/tmp/opencode-config:ro \
       -v ~/.local/share/opencode:/tmp/opencode-data:ro \
