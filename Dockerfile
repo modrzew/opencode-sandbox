@@ -27,6 +27,9 @@ RUN curl -fsSL https://opencode.ai/install | bash
 ENV PATH="/root/.opencode/bin:${PATH}"
 ENV OPENCODE_ENABLE_EXA=1
 
+# pi coding agent (binary lands on PATH at /usr/bin/pi via npm global)
+RUN npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+
 COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
