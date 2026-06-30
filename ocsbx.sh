@@ -34,6 +34,13 @@ CONFIG_FILE="$SCRIPT_DIR/sandbox.env"
 
 hash=$(openssl rand -hex 4)
 
+# Stop the container when this script exits — whether the agent quits normally,
+# the terminal is closed (HUP), or the script is killed (INT/TERM). Without this,
+# the container daemon keeps the container running after the client detaches.
+name=""
+cleanup() { [ -n "$name" ] && container stop "$name" >/dev/null 2>&1 || true; }
+trap cleanup EXIT INT TERM HUP
+
 # compute container name from hash
 compute_name() {
     local h="$1"
@@ -72,7 +79,6 @@ if [ "$MODE" = "resume" ]; then
     read -ra resume_cmd <<< "$(resume_command "$AGENT")"
     set +e
     container exec -it "$name" "${resume_cmd[@]}"
-    container stop "$name" >/dev/null 2>&1
     set -e
 else
     if ! is_agent "$AGENT"; then
