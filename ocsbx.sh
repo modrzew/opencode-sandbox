@@ -31,14 +31,24 @@ CONFIG_FILE="$SCRIPT_DIR/sandbox.env"
 # Domain containers use to reach the host, served by Apple container's local DNS.
 HOST_DNS_DOMAIN="${HOST_DNS_DOMAIN:-host.container.internal}"
 
-# `ocsbx.sh fix-dns` — that local DNS domain occasionally goes stale (usually
-# after the host network changes), leaving containers able to reach the internet
-# but not host.container.internal. Deleting and recreating it fixes it. Needs
-# admin, so it prompts for sudo.
-if [ "${1:-}" = "fix-dns" ]; then
+# Delete and recreate the host DNS domain. It occasionally goes stale (usually
+# after the host network changes), leaving containers unable to resolve the host
+# even though the host itself still can. Needs admin, so it prompts for sudo.
+reset_host_dns() {
     echo "Resetting container DNS domain '$HOST_DNS_DOMAIN' (needs sudo)…"
     sudo container system dns delete "$HOST_DNS_DOMAIN" 2>/dev/null || true
     sudo container system dns create "$HOST_DNS_DOMAIN"
+}
+
+# True if a throwaway container can resolve the host domain (~0.5s). A stale
+# domain still resolves on the host, so we must probe from inside a container.
+host_dns_ok() {
+    container run --rm --entrypoint /usr/bin/getent "$IMAGE" hosts "$HOST_DNS_DOMAIN" >/dev/null 2>&1
+}
+
+# `ocsbx.sh fix-dns` — reset the domain on demand.
+if [ "${1:-}" = "fix-dns" ]; then
+    reset_host_dns
     echo "Done. Registered domains:"
     container system dns ls
     exit 0
@@ -80,6 +90,30 @@ elif [ $# -ge 1 ]; then
     MODE="resume"; hash="$1"
 else
     MODE="fresh"; AGENT="${AGENT:-$DEFAULT_AGENT}"
+fi
+
+# Preflight: confirm the sandbox can resolve host.container.internal before we
+# hand over to the agent, so a stale DNS domain surfaces here — with an offer to
+# fix it on the spot — instead of as a failed first LLM call. Set OCSBX_HOST_CHECK=0
+# (env or sandbox.env) to skip the ~0.5s probe.
+if [ "${OCSBX_HOST_CHECK:-1}" = 1 ] && ! host_dns_ok; then
+    echo "⚠  '$HOST_DNS_DOMAIN' is not resolvable from inside the sandbox — Apple" >&2
+    echo "   container's local DNS domain has likely gone stale." >&2
+    if [ -t 0 ]; then
+        printf "   Reset it now (fix-dns)? [Y/n] " >&2
+        read -r reply
+        case "$reply" in
+            n|N) echo "   Skipping — the agent may fail to reach the host." >&2 ;;
+            *)   reset_host_dns
+                 if host_dns_ok; then
+                     echo "   ✓ fixed." >&2
+                 else
+                     echo "   ✗ still failing — check 'container system dns ls' and whether a VPN is interfering." >&2
+                 fi ;;
+        esac
+    else
+        echo "   Run './ocsbx.sh fix-dns' (or set OCSBX_HOST_CHECK=0 to skip)." >&2
+    fi
 fi
 
 if [ "$MODE" = "resume" ]; then
