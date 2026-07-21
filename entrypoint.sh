@@ -29,7 +29,7 @@ open(path, 'w').write(json.dumps(cfg, indent=2) + '\n')
     mkdir -p /root/.pi
     cp -r /tmp/pi-agent /root/.pi/agent
     # Replace LLM endpoints to host.container.internal (if a local provider is configured)
-    [ -f /root/.pi/agent/settings.json ] && sed -i 's/localhost/host.container.internal/g' /root/.pi/agent/settings.json
+    [ -f /root/.pi/agent/models.json ] && sed -i 's/localhost/host.container.internal/g' /root/.pi/agent/models.json
     ;;
 esac
 

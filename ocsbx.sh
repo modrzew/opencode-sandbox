@@ -136,6 +136,7 @@ else
       -e GIT_NAME="${GIT_NAME:-}" \
       -e GIT_EMAIL="${GIT_EMAIL:-}" \
       -e OCSBX_AGENT="$AGENT" \
+      -e OPENCODE_DISABLE_MODELS_FETCH=1 \
       "$IMAGE" "${launch[@]}"
 fi
 
