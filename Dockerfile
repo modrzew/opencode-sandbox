@@ -14,6 +14,10 @@ RUN wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | te
 # Ensure multiple git commands can work together on the same .git folder
 RUN git config --global gc.auto 0
 
+# Bake github.com SSH host keys into the image so git-over-ssh needs no runtime
+# ssh-keyscan (which stalls ~5s when the sandbox is offline).
+RUN ssh-keyscan github.com >> /etc/ssh/ssh_known_hosts 2>/dev/null
+
 # Node LTS
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs && rm -rf /var/lib/apt/lists/*

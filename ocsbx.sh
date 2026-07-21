@@ -22,15 +22,31 @@ resume_command() {
     esac
 }
 
-# absolute, symlink-resolved paths
-toplevel=$(git rev-parse --show-toplevel); toplevel=$(cd "$toplevel" && pwd -P)
-common=$(git rev-parse --path-format=absolute --git-common-dir); common=$(cd "$common" && pwd -P)
-
 # Resolve the real path of this script (follows symlinks) to find sandbox.env
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd -P)"
 CONFIG_FILE="$SCRIPT_DIR/sandbox.env"
 # shellcheck source=/dev/null
 [ -f "$CONFIG_FILE" ] && source "$CONFIG_FILE"
+
+# Domain containers use to reach the host, served by Apple container's local DNS.
+HOST_DNS_DOMAIN="${HOST_DNS_DOMAIN:-host.container.internal}"
+
+# `ocsbx.sh fix-dns` — that local DNS domain occasionally goes stale (usually
+# after the host network changes), leaving containers able to reach the internet
+# but not host.container.internal. Deleting and recreating it fixes it. Needs
+# admin, so it prompts for sudo.
+if [ "${1:-}" = "fix-dns" ]; then
+    echo "Resetting container DNS domain '$HOST_DNS_DOMAIN' (needs sudo)…"
+    sudo container system dns delete "$HOST_DNS_DOMAIN" 2>/dev/null || true
+    sudo container system dns create "$HOST_DNS_DOMAIN"
+    echo "Done. Registered domains:"
+    container system dns ls
+    exit 0
+fi
+
+# absolute, symlink-resolved paths
+toplevel=$(git rev-parse --show-toplevel); toplevel=$(cd "$toplevel" && pwd -P)
+common=$(git rev-parse --path-format=absolute --git-common-dir); common=$(cd "$common" && pwd -P)
 
 hash=$(openssl rand -hex 4)
 
@@ -106,8 +122,9 @@ else
         esac
     fi
 
-    # Per-agent config mounts + launch command
+    # Per-agent config mounts, launch command, and environment
     launch=()
+    envs=()
     case "$AGENT" in
       opencode)
         [ -d "$HOME/.config/opencode" ] || echo "Warning: $HOME/.config/opencode not found — opencode may be unconfigured."
@@ -116,6 +133,14 @@ else
           -v "$HOME/.local/share/opencode:/tmp/opencode-data:ro"
           -v "$HOME/.cache/opencode:/root/.cache/opencode"
           -v "$HOME/.local/state/opencode:/tmp/opencode-state:ro"
+        )
+        # Suppress opencode's startup network calls — each of these otherwise
+        # hangs for seconds (until it times out) when the sandbox is offline.
+        envs+=(
+          -e OPENCODE_DISABLE_MODELS_FETCH=1   # models.dev catalog fetch
+          -e OPENCODE_DISABLE_AUTOUPDATE=1     # version / update check
+          -e OPENCODE_DISABLE_LSP_DOWNLOAD=1   # on-demand LSP server downloads
+          -e OPENCODE_DISABLE_SHARE=1          # session-share service pings
         )
         launch=(opencode)
         ;;
@@ -128,15 +153,17 @@ else
 
     # Capture gh token live from host
     GH_TOKEN=$(gh auth token 2>/dev/null || true)
+    envs+=(
+      -e GH_TOKEN="$GH_TOKEN"
+      -e GIT_NAME="${GIT_NAME:-}"
+      -e GIT_EMAIL="${GIT_EMAIL:-}"
+      -e OCSBX_AGENT="$AGENT"
+    )
 
     container run -it --name "$name" \
       --cpus 4 --memory 6g \
       "${mounts[@]}" -w "$toplevel" \
-      -e GH_TOKEN="$GH_TOKEN" \
-      -e GIT_NAME="${GIT_NAME:-}" \
-      -e GIT_EMAIL="${GIT_EMAIL:-}" \
-      -e OCSBX_AGENT="$AGENT" \
-      -e OPENCODE_DISABLE_MODELS_FETCH=1 \
+      "${envs[@]}" \
       "$IMAGE" "${launch[@]}"
 fi
 
