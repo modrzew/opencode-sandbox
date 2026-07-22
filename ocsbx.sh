@@ -54,9 +54,15 @@ if [ "${1:-}" = "fix-dns" ]; then
     exit 0
 fi
 
-# absolute, symlink-resolved paths
-toplevel=$(git rev-parse --show-toplevel); toplevel=$(cd "$toplevel" && pwd -P)
-common=$(git rev-parse --path-format=absolute --git-common-dir); common=$(cd "$common" && pwd -P)
+# absolute, symlink-resolved paths. Outside a git repo, fall back to the current
+# directory as the tree to mount and leave $common empty — no git wiring at all.
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    toplevel=$(git rev-parse --show-toplevel); toplevel=$(cd "$toplevel" && pwd -P)
+    common=$(git rev-parse --path-format=absolute --git-common-dir); common=$(cd "$common" && pwd -P)
+else
+    toplevel=$(pwd -P)
+    common=""
+fi
 
 hash=$(openssl rand -hex 4)
 
@@ -70,6 +76,11 @@ trap cleanup EXIT INT TERM HUP
 # compute container name from hash
 compute_name() {
     local h="$1"
+    # No git (or .git inside the tree) — name after the working tree alone.
+    if [ -z "$common" ]; then
+        echo "oc-$(basename "$toplevel")-$h"
+        return
+    fi
     case "$common/" in
       "$toplevel"/*)
         echo "oc-$(basename "$toplevel")-$h"
@@ -141,11 +152,14 @@ else
     # always mount the working tree at its own absolute path
     mounts=(-v "$toplevel:$toplevel")
 
-    # the worktree check: if the shared .git lives OUTSIDE the tree, mount it too
-    case "$common/" in
-      "$toplevel"/*) ;;                     # main repo — .git already inside the mount
-      *) mounts+=(-v "$common:$common") ;;  # linked worktree — add the shared .git
-    esac
+    # the worktree check: if the shared .git lives OUTSIDE the tree, mount it too.
+    # $common is empty when launched outside a git repo — nothing to mount.
+    if [ -n "$common" ]; then
+        case "$common/" in
+          "$toplevel"/*) ;;                     # main repo — .git already inside the mount
+          *) mounts+=(-v "$common:$common") ;;  # linked worktree — add the shared .git
+        esac
+    fi
 
     # Mount SSH key if configured (only if outside the mounted directory)
     if [ -n "${SSH_KEY_PATH:-}" ] && [ -f "$SSH_KEY_PATH" ]; then
