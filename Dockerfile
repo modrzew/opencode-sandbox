@@ -1,9 +1,12 @@
 FROM debian:bookworm-slim
 
+# fd-find (as `fdfind`) and ripgrep back pi's file picker and grep tool. pi looks
+# for them on PATH — see systemBinaryNames in its tools-manager — and would
+# otherwise try to download them, which PI_OFFLINE=1 below blocks.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git unzip openssh-client \
       build-essential python3 python3-venv python3-pip \
-      wget apt-transport-https \
+      wget apt-transport-https fd-find ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
 # GitHub CLI (gh)

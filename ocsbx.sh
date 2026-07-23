@@ -156,6 +156,18 @@ if [ "${OCSBX_HOST_CHECK:-1}" = 1 ] && ! host_dns_ok; then
     fi
 fi
 
+# Apple's container synthesizes TERM=xterm and forwards nothing else, so the
+# agent sees a generic terminal and disables its richer output. pi in particular
+# decides on inline images, 24-bit color and OSC 8 hyperlinks purely from these
+# vars — it never queries the terminal — so without them a ghostty/kitty/iTerm
+# host silently degrades to the plain-xterm path.
+#
+# A bare `-e KEY` inherits the host's value (and is a no-op if unset). TERM is
+# pinned rather than inherited: the image only carries the stock terminfo
+# entries, so passing e.g. xterm-ghostty through would leave ncurses programs
+# inside (less, vim) with no terminfo to load.
+term_envs=(-e TERM=xterm-256color -e COLORTERM -e TERM_PROGRAM)
+
 if [ "$MODE" = "resume" ]; then
     name=$(compute_name "$hash")
     if ! container start "$name" >/dev/null 2>&1; then
@@ -168,7 +180,7 @@ if [ "$MODE" = "resume" ]; then
     AGENT="${AGENT:-$DEFAULT_AGENT}"
     read -ra resume_cmd <<< "$(resume_command "$AGENT")"
     set +e
-    container exec -it "$name" "${resume_cmd[@]}"
+    container exec -it "${term_envs[@]}" "$name" "${resume_cmd[@]}"
     set -e
 else
     if ! is_agent "$AGENT"; then
@@ -226,6 +238,7 @@ else
     # Capture gh token live from host
     GH_TOKEN=$(gh auth token 2>/dev/null || true)
     envs+=(
+      "${term_envs[@]}"
       -e GH_TOKEN="$GH_TOKEN"
       -e GIT_NAME="${GIT_NAME:-}"
       -e GIT_EMAIL="${GIT_EMAIL:-}"

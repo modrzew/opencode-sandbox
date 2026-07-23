@@ -50,6 +50,13 @@ open(path, 'w').write(json.dumps(cfg, indent=2) + '\n')
     # npm/ (installed subagents & MCP adapters) and bin/ (fd, rg) are read-only
     # at runtime and account for ~almost all of the dir's size → symlink them.
     sync_agent_home /tmp/pi-agent /root/.pi/agent npm bin
+    # …except bin/ holds the *host's* fd and rg — macOS Mach-O binaries that
+    # can't execute here. pi probes that dir before PATH and only checks that
+    # the file exists, so it would spawn one, get ENOEXEC and silently see an
+    # empty result — which is what breaks the `@` file picker. Drop the symlink
+    # (the read-only mount itself is untouched) so pi falls through to the Linux
+    # fdfind/rg installed in the image.
+    rm -rf /root/.pi/agent/bin
     # Replace LLM endpoints to host.container.internal (if a local provider is configured)
     [ -f /root/.pi/agent/models.json ] && sed -i 's/localhost/host.container.internal/g' /root/.pi/agent/models.json
     ;;
