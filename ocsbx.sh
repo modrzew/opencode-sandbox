@@ -54,6 +54,35 @@ if [ "${1:-}" = "fix-dns" ]; then
     exit 0
 fi
 
+# `ocsbx.sh build`  — build the image, reusing every cached layer.
+# `ocsbx.sh update` — same, but pull the current opencode + pi. The agents never
+# update themselves (see the *_DISABLE_* / PI_OFFLINE env in the Dockerfile), so
+# this is the one place their versions move. A fresh AGENTS_VERSION invalidates
+# the opencode layer and everything below it; apt, gh, node and bun stay cached,
+# making an update two downloads rather than a full rebuild.
+case "${1:-}" in
+  build|update)
+    # `update` passes a fresh cache key, so the agent layers are reinstalled;
+    # `build` passes the Dockerfile's own default, so they stay cached.
+    if [ "$1" = "update" ]; then
+        cache_key=$(date +%s)
+        echo "Rebuilding '$IMAGE' with the latest opencode + pi…"
+    else
+        cache_key=1
+        echo "Building '$IMAGE'…"
+    fi
+    container build --build-arg "AGENTS_VERSION=$cache_key" -t "$IMAGE" "$SCRIPT_DIR"
+    # Report what actually landed, so `update` is verifiable rather than hopeful.
+    # Bypass the entrypoint: it expects the /tmp config mounts, which aren't here.
+    echo ""
+    echo "Installed:"
+    container run --rm --entrypoint /bin/sh "$IMAGE" -c \
+      'printf "  opencode  "; opencode --version 2>/dev/null || echo "?"
+       printf "  pi        "; pi --version 2>/dev/null || echo "?"' || true
+    exit 0
+    ;;
+esac
+
 # absolute, symlink-resolved paths. Outside a git repo, fall back to the current
 # directory as the tree to mount and leave $common empty — no git wiring at all.
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -182,14 +211,9 @@ else
           -v "$HOME/.cache/opencode:/root/.cache/opencode"
           -v "$HOME/.local/state/opencode:/tmp/opencode-state:ro"
         )
-        # Suppress opencode's startup network calls — each of these otherwise
-        # hangs for seconds (until it times out) when the sandbox is offline.
-        envs+=(
-          -e OPENCODE_DISABLE_MODELS_FETCH=1   # models.dev catalog fetch
-          -e OPENCODE_DISABLE_AUTOUPDATE=1     # version / update check
-          -e OPENCODE_DISABLE_LSP_DOWNLOAD=1   # on-demand LSP server downloads
-          -e OPENCODE_DISABLE_SHARE=1          # session-share service pings
-        )
+        # Startup network calls (models.dev fetch, update check, LSP downloads,
+        # share pings) are suppressed by ENV in the Dockerfile, so they apply on
+        # resume as well as here.
         launch=(opencode)
         ;;
       pi)

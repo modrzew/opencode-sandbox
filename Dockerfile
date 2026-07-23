@@ -26,13 +26,35 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:${PATH}"
 
+# --- Coding agents ------------------------------------------------------------
+# Installed last so a rebuild reuses every layer above (apt, gh, node, bun).
+# AGENTS_VERSION exists only to give the build cache something to invalidate: the
+# opencode RUN references it, so changing it reinstalls opencode *and* every layer
+# below it (pi included), while everything above stays cached. An ARG that no RUN
+# references would bust nothing. `./ocsbx.sh update` passes a fresh timestamp.
+ARG AGENTS_VERSION=1
+
 # OpenCode (confirm against their current install docs)
-RUN curl -fsSL https://opencode.ai/install | bash
+RUN echo "opencode+pi cache key: ${AGENTS_VERSION}" \
+    && curl -fsSL https://opencode.ai/install | bash
 ENV PATH="/root/.opencode/bin:${PATH}"
 ENV OPENCODE_ENABLE_EXA=1
+# Suppress opencode's startup network calls — each otherwise hangs for seconds
+# (until it times out) when the sandbox is offline. Baked into the image rather
+# than passed as `container run -e` so they cover the `container exec` used on
+# resume too, not just the initial run.
+ENV OPENCODE_DISABLE_MODELS_FETCH=1
+ENV OPENCODE_DISABLE_AUTOUPDATE=1
+ENV OPENCODE_DISABLE_LSP_DOWNLOAD=1
+ENV OPENCODE_DISABLE_SHARE=1
 
 # pi coding agent (binary lands on PATH at /usr/bin/pi via npm global)
 RUN npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+# pi's equivalent: skips its startup version check, package-update check and
+# install telemetry. The npm/ packages are read-only symlinks and the binary is
+# pinned to this image, so none of those could achieve anything anyway.
+# Startup only — runtime LLM/MCP calls are unaffected.
+ENV PI_OFFLINE=1
 
 COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

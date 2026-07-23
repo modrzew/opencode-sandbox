@@ -102,10 +102,10 @@ git clone https://github.com/your-org/opencode-sandbox.git
 cd opencode-sandbox
 ```
 
-### Step 2: Build the Docker Image
+### Step 2: Build the Image
 
 ```bash
-docker build -t opencode-sandbox .
+./ocsbx.sh build
 ```
 
 ### Step 3: Run the Sandbox
@@ -319,7 +319,10 @@ If you encounter any issues or have questions, please:
 
 ### Q: How do I update to the latest version?
 
-**A:** Simply pull the latest changes from the repository and rebuild the Docker image.
+**A:** Run `./ocsbx.sh update`. The agents deliberately never update themselves — a
+sandbox is short-lived and often offline, so a startup update check only buys you a
+hang when the network is down. `update` refreshes just the opencode and pi layers
+(everything below them stays cached) and prints both versions when it finishes.
 
 ---
 
